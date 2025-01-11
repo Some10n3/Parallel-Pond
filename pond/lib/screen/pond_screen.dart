@@ -1,8 +1,8 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:mqtt_client/mqtt_client.dart';
-import 'package:mqtt_client/mqtt_server_client.dart';
-import 'dart:async';
-import 'dart:convert';
+import 'package:pond/mqtt/state/MQTTAppState.dart';
+import 'package:pond/mqtt/MQTTManager.dart';
+import 'package:provider/provider.dart';
 
 class PondScreen extends StatefulWidget {
   final String pondName;
@@ -13,156 +13,164 @@ class PondScreen extends StatefulWidget {
 }
 
 class _PondScreenState extends State<PondScreen> {
-  late MqttServerClient client;
-  String statusMessage = "Disconnected";
-  String receivedMessage = "No messages yet";
-  final String topic =
-      "fishhaven/stream"; // Updated to match Python script topic
-  Timer? _imageChangeTimer;
-
-  final List<String> images = [
-    'lib/assets/tile1.png',
-    'lib/assets/tile2.png',
-    'lib/assets/tile3.png',
-    'lib/assets/tile4.png'
-  ];
-  int _currentIndex = 0;
+  final TextEditingController _hostTextController = TextEditingController();
+  final TextEditingController _topicTextController = TextEditingController();
+  final TextEditingController _messageTextController = TextEditingController();
+  late MQTTAppState currentAppState;
+  late MQTTManager manager;
 
   @override
   void initState() {
     super.initState();
-    connectToMQTT();
-    startImageChangeTimer();
+    // Initialize the manager with the provided MQTT server details
+    currentAppState = MQTTAppState();
+    manager = MQTTManager(
+      state: currentAppState,
+      identifier: 'ios', // Use a unique client identifier
+      host: '40.90.169.126', // The MQTT broker IP address
+      port: 1883, // The MQTT broker port
+      username: 'dc24', // MQTT username
+      password: 'kmitl-dc24', // MQTT password
+      topic: 'fishhaven/stream', // The topic to subscribe/publish
+    );
+    manager.initializeMQTTClient();
+    manager.connect();
   }
 
   @override
   void dispose() {
-    _imageChangeTimer?.cancel();
+    _hostTextController.dispose();
+    _topicTextController.dispose();
+    _messageTextController.dispose();
     super.dispose();
   }
 
-  void onConnected() {
-    setState(() {
-      statusMessage = "Connected to MQTT broker!";
-    });
-  }
-
-  void onDisconnected() {
-    setState(() {
-      statusMessage = "Disconnected from MQTT broker!";
-    });
-  }
-
-  void onSubscribed(String topic) {
-    setState(() {
-      statusMessage = "Subscribed to $topic";
-    });
-  }
-
-  Future<void> connectToMQTT() async {
-    client = MqttServerClient('40.90.169.126', '');
-    client.port = 1883;
-    client.logging(on: true);
-    client.onConnected = onConnected;
-    client.onDisconnected = onDisconnected;
-    client.onSubscribed = onSubscribed;
-
-    final connMessage = MqttConnectMessage()
-        .withClientIdentifier(widget.pondName)
-        .authenticateAs('dc24', 'kmitl-dc24')
-        .startClean()
-        .withWillTopic('willtopic')
-        .withWillMessage('Client Disconnected')
-        .withWillQos(MqttQos.atLeastOnce);
-
-    client.connectionMessage = connMessage;
-
-    try {
-      await client.connect();
-    } catch (e) {
-      setState(() {
-        statusMessage = "Connection failed: $e";
-      });
-      client.disconnect();
-    }
-
-    if (client.connectionStatus?.state == MqttConnectionState.connected) {
-      setState(() {
-        statusMessage = "Connected to MQTT broker!";
-      });
-
-      client.subscribe(topic, MqttQos.atLeastOnce);
-      client.updates?.listen((List<MqttReceivedMessage<MqttMessage>> events) {
-        final MqttPublishMessage recMessage =
-            events[0].payload as MqttPublishMessage;
-        final String message = MqttPublishPayload.bytesToStringAsString(
-            recMessage.payload.message);
-
-        setState(() {
-          receivedMessage = message;
-        });
-      });
-    } else {
-      setState(() {
-        statusMessage = "Failed to connect: ${client.connectionStatus?.state}";
-      });
-      client.disconnect();
-    }
-  }
-
-  void startImageChangeTimer() {
-    _imageChangeTimer = Timer.periodic(Duration(milliseconds: 300), (timer) {
-      setState(() {
-        _currentIndex = (_currentIndex + 1) % images.length;
-      });
-    });
+  _printLatestValue() {
+    print('Second text field: ${_hostTextController.text}');
+    print('Second text field: ${_topicTextController.text}');
+    print('Second text field: ${_messageTextController.text}');
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Pond: ${widget.pondName}'),
-      ),
-      body: Center(
+    final appState = Provider.of<MQTTAppState>(context);
+    currentAppState = appState;
+    var scaffold = Scaffold(
+        appBar: _buildAppBar(context) as PreferredSizeWidget,
+        body: _buildColumn());
+    return scaffold;
+  }
+
+  Widget _buildAppBar(BuildContext context) {
+    return AppBar(
+      title: Text('Fish Haven - Pond'),
+      backgroundColor: Colors.blue,
+    );
+  }
+
+  Widget _buildColumn() {
+    return Column(
+      children: <Widget>[
+        _buildConnectionStateText(_prepareStateMessageFrom(
+            currentAppState.getAppConnectionState ??
+                MQTTAppConnectionState.disconnected)),
+        _buildEditableColumn(),
+        _buildScrollableTextWith(currentAppState.getHistoryText),
+      ],
+    );
+  }
+
+  Widget _buildEditableColumn() {
+    return Padding(
+        padding: const EdgeInsets.all(20.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 400,
-              height: 400,
-              decoration: BoxDecoration(
-                color: Colors.blue,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.black, width: 3),
-              ),
-              child: Center(
-                child: Image.asset(
-                  images[_currentIndex],
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
+          children: <Widget>[
+            _buildTextFieldWith(
+                _hostTextController,
+                'Enter broker address',
+                currentAppState.getAppConnectionState ??
+                    MQTTAppConnectionState.disconnected),
             SizedBox(height: 20),
-            Text(
-              'Pond Name: ${widget.pondName}',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
+            _buildTextFieldWith(
+                _topicTextController,
+                'Enter a topic to subscribe or listen',
+                currentAppState.getAppConnectionState ??
+                    MQTTAppConnectionState.disconnected),
             SizedBox(height: 20),
-            Text(
-              'Status: $statusMessage',
-              style: TextStyle(fontSize: 16),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 20),
-            Text(
-              'Received Message: $receivedMessage',
-              style: TextStyle(fontSize: 16, color: Colors.green),
-              textAlign: TextAlign.center,
-            ),
+            _buildTextFieldWith(
+                _messageTextController,
+                'Enter a message to publish',
+                currentAppState.getAppConnectionState ??
+                    MQTTAppConnectionState.disconnected),
           ],
+        ));
+  }
+
+  Widget _buildTextFieldWith(TextEditingController controller, String hintText,
+      MQTTAppConnectionState state) {
+    bool shouldEnable = false;
+    if (controller == _messageTextController &&
+        state == MQTTAppConnectionState.connected) {
+      shouldEnable = true;
+    } else if (controller == _hostTextController &&
+        state == MQTTAppConnectionState.disconnected) {
+      shouldEnable = true;
+    } else if (controller == _topicTextController &&
+        state == MQTTAppConnectionState.disconnected) {
+      shouldEnable = true;
+    }
+
+    return TextField(
+      enabled: shouldEnable,
+      controller: controller,
+      decoration: InputDecoration(
+        contentPadding: EdgeInsets.only(left: 0, bottom: 0, top: 0, right: 0),
+        labelText: hintText,
+      ),
+    );
+  }
+
+  Widget _buildConnectionStateText(String state) {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Container(
+            color: Colors.deepOrangeAccent,
+            child: Center(
+              child: Text(
+                state,
+                style: TextStyle(fontSize: 24),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScrollableTextWith(String text) {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: Container(
+        width: 400,
+        height: 300,
+        child: SingleChildScrollView(
+          child: Text(text),
         ),
       ),
     );
+  }
+}
+
+String _prepareStateMessageFrom(MQTTAppConnectionState state) {
+  switch (state) {
+    case MQTTAppConnectionState.connected:
+      return 'Connected';
+    case MQTTAppConnectionState.connecting:
+      return 'Connecting';
+    case MQTTAppConnectionState.disconnected:
+      return 'Disconnected';
+    default:
+      return 'Error';
   }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:pond/mqtt/state/MQTTAppState.dart';
 import 'package:pond/screen/pond_screen.dart';
+import 'package:provider/provider.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,7 +15,10 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Fish Haven - Pond',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: PondScreen(pondName: 'Parallel Pond'),
+      home: ChangeNotifierProvider<MQTTAppState>(
+        create: (_) => MQTTAppState(),
+        child: const PondScreen(pondName: 'Fish Haven - Pond'),
+      ),
     );
   }
 }
