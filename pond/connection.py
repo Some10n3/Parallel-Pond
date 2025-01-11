@@ -55,10 +55,10 @@ received_messages = []
 def load_gif_frames():
     frames = []
     try:
-        frames.append(pygame.image.load("C:/Users/usEr/Desktop/Parallel-Pond/pond/lib/assets/tile1.png"))
-        frames.append(pygame.image.load("C:/Users/usEr/Desktop/Parallel-Pond/pond/lib/assets/tile2.png"))
-        frames.append(pygame.image.load("C:/Users/usEr/Desktop/Parallel-Pond/pond/lib/assets/tile3.png"))
-        frames.append(pygame.image.load("C:/Users/usEr/Desktop/Parallel-Pond/pond/lib/assets/tile4.png"))
+        frames.append(pygame.image.load("./lib/assets/tile1.png"))
+        frames.append(pygame.image.load("./lib/assets/tile2.png"))
+        frames.append(pygame.image.load("./lib/assets/tile3.png"))
+        frames.append(pygame.image.load("./lib/assets/tile4.png"))
         # Resize frames to 50x50
         frames = [pygame.transform.scale(frame, (50, 50)) for frame in frames]
         return frames
