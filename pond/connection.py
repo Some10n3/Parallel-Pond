@@ -6,6 +6,7 @@ import random
 import math
 import os
 from PIL import Image
+from fish import Fish
 #pip install pillow
 
 # MQTT server details
@@ -41,6 +42,7 @@ SEND_MESSAGE = {
 # Pygame setup
 pygame.init()
 screen_width, screen_height = 1200, 800
+clock = pygame.time.Clock()
 screen = pygame.display.set_mode((screen_width, screen_height))  # Larger screen size (1200x800)
 pygame.display.set_caption("MQTT Message Pond with GIF")
 font = pygame.font.Font(None, 36)
@@ -57,22 +59,24 @@ last_update_time = time.time()
 # To hold the latest received messages
 received_messages = []
 
-# Load and resize GIF frames as individual images
-def load_gif_frames():
+# Load and resize GIF frames
+def load_gif_frames(gif_path):
     frames = []
     try:
-        frames.append(pygame.image.load("./lib/assets/tile1.png"))
-        frames.append(pygame.image.load("./lib/assets/tile2.png"))
-        frames.append(pygame.image.load("./lib/assets/tile3.png"))
-        frames.append(pygame.image.load("./lib/assets/tile4.png"))
-        # Resize frames to 50x50
-        frames = [pygame.transform.scale(frame, (50, 50)) for frame in frames]
+        gif = Image.open(gif_path)
+        for frame in range(gif.n_frames):
+            gif.seek(frame)
+            frame_image = gif.convert("RGBA")
+            frame_surface = pygame.image.fromstring(frame_image.tobytes(), frame_image.size, frame_image.mode)
+            frame_surface = pygame.transform.scale(frame_surface, (50, 50))
+            frames.append(frame_surface)
         return frames
-    except pygame.error as e:
-        print(f"Unable to load images: {e}")
+    except Exception as e:
+        print(f"Unable to load GIF frames: {e}")
         return []
 
-fish_frames = load_gif_frames()  # Load and resize the frames for the GIF
+fish_frames = load_gif_frames("./lib/assets/Parallel.gif")
+# fish_frames = load_gif_frames("./lib/assets/DC_UNIVERSE.gif")
 
 # Callback when the client connects to the broker
 def on_connect(client, userdata, flags, rc):
@@ -88,6 +92,11 @@ def on_connect(client, userdata, flags, rc):
 def on_message(client, userdata, msg):
     message = msg.payload.decode()
     print(f"Message received on topic {msg.topic}: {message}")
+    if msg.topic == "user/DC_Universe":
+        DC_FRAME = load_gif_frames("./lib/assets/DC_Universe.gif")
+        DC_POSITION = generate_random_position(pond_center, pond_radius, fish_frames[0].get_rect())
+        fish_animations.append(Fish(DC_FRAME, DC_POSITION, message.name))
+
     # Add received message to the list
     received_messages.append(message)
     if len(received_messages) > 10:  # Keep only the latest 10 messages
@@ -113,19 +122,6 @@ client.loop_start()
 client.subscribe(TOPIC)
 client.subscribe("user/Parallel")
 
-# Function to send a message when the button is pressed
-def send_mqtt_message(gif_path):
-    print("Sending message with GIF:", gif_path)
-    message = {
-        "type": "image_sequence",
-        "sender": "User",
-        "timestamp": int(time.time()),
-        "data": {
-            "gif_path": gif_path  # Send the path of the GIF file
-        }
-    }
-    client.publish(TOPIC, json.dumps(message))
-
 def send_fish_to_topicX(topicX, fishName, remainingLifetime):
     print("Sending message to topic:", topicX)
     message = { 
@@ -147,45 +143,9 @@ def generate_random_position(center, radius, image_rect):
     y = center[1] + distance * math.sin(angle)
     return x, y
 
-# Fish class to hold the fish GIF animation
-class Fish:
-    def __init__(self, frames, position):
-        self.frames = frames
-        self.position = position
-        self.current_frame_index = 0
-        self.last_frame_time = time.time()
-
-    def update(self):
-        current_time = time.time()
-        # Update the fish animation (switch frames every 500ms)
-        if current_time - self.last_frame_time > 0.5:
-            self.current_frame_index = (self.current_frame_index + 1) % len(self.frames)
-            self.last_frame_time = current_time
-
-    def draw(self, surface):
-        surface.blit(self.frames[self.current_frame_index], self.position)
-
-    def save_as_gif(self, gif_name):
-        # Create a list of images for the GIF
-        pil_frames = []
-        
-        for frame in self.frames:
-            # Convert each Pygame surface to a byte string in RGBA format
-            frame_bytes = pygame.image.tostring(frame, 'RGBA')
-            
-            # Create a PIL Image from the byte string
-            pil_image = Image.frombytes('RGBA', (frame.get_width(), frame.get_height()), frame_bytes)
-            
-            # Append the PIL Image to the frames list
-            pil_frames.append(pil_image)
-        
-        # Save the frames as a GIF
-        pil_frames[0].save(gif_name, save_all=True, append_images=pil_frames[1:], loop=0, duration=500)
-        return gif_name
-
-
 # Main loop to keep the script running and display messages
 running = True
+fish_id = 0
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -198,17 +158,13 @@ while running:
             if button_rect_spawn.collidepoint(mouse_x, mouse_y):
                 # Spawn a new fish (GIF) at a random position in the pond
                 fish_position = generate_random_position(pond_center, pond_radius, fish_frames[0].get_rect())
-                fish_animations.append(Fish(fish_frames, fish_position))  # Add new fish to the list
+                fish_animations.append(Fish(fish_frames, fish_position, fish_id))  # Add new fish to the list
+                fish_id += 1  # Increment the fish ID
                 
             # Check if the mouse click is inside the Send Message button area
             if button_rect_send.collidepoint(mouse_x, mouse_y) and fish_animations:
-                # Remove one fish from the pond (decrement one element)
+                send_fish_to_topicX(DC_UNIVERSE, f"Fish{fish_animations[0].name}", fish_animations[0].remainingLifetime)
                 fish_animations.pop(0)  # Remove the first fish in the list
-                
-                # Save the fish as a GIF and send the path of the GIF
-                gif_path = fish_animations[0].save_as_gif("fish_animation.gif")
-                # send_mqtt_message(gif_path)
-                send_fish_to_topicX(DC_UNIVERSE, "Fish", 5)
 
     # Fill the screen with the background color
     screen.fill(bg_color)
@@ -222,22 +178,26 @@ while running:
 
     # Update and draw the fish (GIFs) inside the pond
     for fish in fish_animations:
-        fish.update()
+        if not fish.update():
+            print("removed fish", fish.name)
+            fish_animations.remove(fish)  # Remove the fish if its lifetime is over
         fish.draw(screen)
 
     # Draw the "Spawn Picture" button on the left
     button_rect_spawn = pygame.Rect(10, 550, 200, 50)  # Bottom-left corner (10, 550)
     pygame.draw.rect(screen, button_color, button_rect_spawn)
-    button_text_spawn = font.render("Spawn Pictures", True, button_text_color)
+    button_text_spawn = font.render("Spawn Fish", True, button_text_color)
     screen.blit(button_text_spawn, (button_rect_spawn.x + 10, button_rect_spawn.y + 10))  # Center the text
 
     # Draw the "Send Message" button on the right
     button_rect_send = pygame.Rect(990, 550, 200, 50)  # Bottom-right corner (990, 550)
     pygame.draw.rect(screen, button_color, button_rect_send)
-    button_text_send = font.render("Send Message", True, button_text_color)
+    button_text_send = font.render("Send Fish", True, button_text_color)
     screen.blit(button_text_send, (button_rect_send.x + 10, button_rect_send.y + 10))  # Center the text
 
     # Update the display
     pygame.display.flip()
 
-   
+    # Cap the frame rate to 60 frames per second
+    clock.tick(60)
+
