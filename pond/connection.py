@@ -15,6 +15,12 @@ USERNAME = "dc24"
 PASSWORD = "kmitl-dc24"
 TOPIC = "fishhaven/stream"
 
+# Define topic for each users
+
+# topic for sending to DC_UNIVERSE group
+DC_UNIVERSE = "user/DC_Universe"
+
+
 # Define the "hello" message
 HELLO_MESSAGE = {
     "type": "hello",
@@ -105,6 +111,7 @@ client.loop_start()
 
 # Subscribe to the same topic to receive messages
 client.subscribe(TOPIC)
+client.subscribe("user/Parallel")
 
 # Function to send a message when the button is pressed
 def send_mqtt_message(gif_path):
@@ -118,6 +125,16 @@ def send_mqtt_message(gif_path):
         }
     }
     client.publish(TOPIC, json.dumps(message))
+
+def send_fish_to_topicX(topicX, fishName, remainingLifetime):
+    print("Sending message to topic:", topicX)
+    message = { 
+        "name": fishName,
+        "group_name": "Parallel",
+        "lifetime": remainingLifetime
+    } 
+    print(f"Sending message: {message}")
+    client.publish(topicX, json.dumps(message))
 
 # Generate a random position within the circle
 def generate_random_position(center, radius, image_rect):
@@ -190,7 +207,8 @@ while running:
                 
                 # Save the fish as a GIF and send the path of the GIF
                 gif_path = fish_animations[0].save_as_gif("fish_animation.gif")
-                send_mqtt_message(gif_path)
+                # send_mqtt_message(gif_path)
+                send_fish_to_topicX(DC_UNIVERSE, "Fish", 5)
 
     # Fill the screen with the background color
     screen.fill(bg_color)
