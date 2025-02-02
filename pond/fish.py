@@ -4,7 +4,7 @@ from PIL import Image
 
 # Fish class to hold the fish GIF animation
 class Fish:
-    def __init__(self, frames, position, id=None):
+    def __init__(self, frames, position, id=None, lifetime=20):
         if not id:
             self.name = "Parallel_" + str(time.time())
         else:
@@ -13,7 +13,7 @@ class Fish:
         self.position = position
         self.current_frame_index = 0
         self.last_frame_time = time.time()
-        self.remainingLifetime = 20
+        self.remainingLifetime = lifetime
 
     def update(self):
         current_time = time.time()

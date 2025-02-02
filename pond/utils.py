@@ -4,35 +4,7 @@ from PIL import Image
 import random
 import math
 import json
-
-
-with open('MQTT.json', 'r') as config_file:
-    config = json.load(config_file)
-
-BROKER = config['BROKER']
-PORT = config['PORT']
-USERNAME = config['USERNAME']
-PASSWORD = config['PASSWORD']
-TOPIC = config['TOPIC']
-
-
-# topic for sending to other group
-DC_UNIVERSE = "user/DC_Universe"
-NETLINK = "user/NetLink"
-
-# To hold the latest received messages
-received_messages = [] 
-
-# Pygame setup
-screen_width, screen_height = 1200, 800
-pygame.font.init()
-font = pygame.font.Font(None, 36)
-text_color = (255, 255, 255)  # White text
-bg_color = (26, 148, 49)  # Green background
-button_color = (0, 128, 0)  # Green button
-button_text_color = (255, 255, 255)  # White text for the button
-circle_color = (173, 216, 230)  # Blue circle
-
+from fish import Fish
 
 # Load and resize GIF frames
 def load_gif_frames(gif_path):
@@ -67,22 +39,23 @@ def on_connect(client, userdata, flags, rc):
 
 # Callback when a message is received from the broker
 def on_message(client, userdata, msg):
-    message = msg.payload.decode()
-    print(f"Message received on topic {msg.topic}: {message}")
+    payload = json.loads(msg.payload.decode())
+    print(f"Message received on topic {msg.topic}: {payload}")
     if msg.topic == "user/Parallel":
-        if message.group_name == "DC_Universe":
+        if payload['group_name'] == "DC_Universe":
             DC_FRAME = load_gif_frames("./lib/assets/DC_Universe.gif")
             DC_POSITION = generate_random_position(pond_center, pond_radius, fish_frames[0].get_rect())
-            fish_animations.append(Fish(DC_FRAME, DC_POSITION, message.name))
-        elif message.group_name == "NetLink":
+            fish_animations.append(Fish(DC_FRAME, DC_POSITION, payload['name'], payload['lifetime']))
+        elif payload['group_name'] == "NetLink":
             NETLINK_FRAME = load_gif_frames("./lib/assets/NetLink.gif")
             NETLINK_POSITION = generate_random_position(pond_center, pond_radius, fish_frames[0].get_rect())
-            fish_animations.append(Fish(NETLINK_FRAME, NETLINK_POSITION, message.name))
+            fish_animations.append(Fish(NETLINK_FRAME, NETLINK_POSITION, payload['name'], payload['lifetime']))
 
     # Add received message to the list
-    received_messages.append(message)
-    if len(received_messages) > 10:  # Keep only the latest 10 messages
+    received_messages.append(payload)
+    if len(received_messages) > 10: 
         received_messages.pop(0)
+
 
 def send_fish_to_topicX(client, topicX, fishName, remainingLifetime):
     print("Sending message to topic:", topicX)
@@ -104,3 +77,38 @@ def generate_random_position(center, radius, image_rect):
     x = center[0] + distance * math.cos(angle)
     y = center[1] + distance * math.sin(angle)
     return x, y
+
+
+with open('MQTT.json', 'r') as config_file:
+    config = json.load(config_file)
+
+BROKER = config['BROKER']
+PORT = config['PORT']
+USERNAME = config['USERNAME']
+PASSWORD = config['PASSWORD']
+TOPIC = config['TOPIC']
+
+
+# topic for sending to other group
+DC_UNIVERSE = "user/DC_Universe"
+NETLINK = "user/NetLink"
+
+# Pond parameters
+received_messages = [] 
+fish_animations = []
+last_update_time = time.time()
+fish_frames = load_gif_frames("./lib/assets/Parallel.gif")
+
+# Pygame setup
+screen_width, screen_height = 1200, 800
+pygame.font.init()
+font = pygame.font.Font(None, 36)
+text_color = (255, 255, 255)  # White text
+bg_color = (26, 148, 49)  # Green background
+button_color = (0, 128, 0)  # Green button
+button_text_color = (255, 255, 255)  # White text for the button
+circle_color = (173, 216, 230)  # Blue circle
+
+# Calculate center of the screen for the pond
+pond_center = (screen_width // 2, screen_height // 2)  # Center of screen (600, 400)
+pond_radius = 200

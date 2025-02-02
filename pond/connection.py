@@ -14,11 +14,6 @@ clock = pygame.time.Clock()
 screen = pygame.display.set_mode((screen_width, screen_height))  # Larger screen size (1200x800)
 pygame.display.set_caption("Parallel Pond")
 
-# Pond parameters
-fish_animations = []
-last_update_time = time.time()
-fish_frames = load_gif_frames("./lib/assets/Parallel.gif")
-
 # Create an MQTT client instance
 client = mqtt.Client()
 
@@ -63,10 +58,6 @@ while running:
 
     # Fill the screen with the background color
     screen.fill(bg_color)
-
-    # Calculate center of the screen for the pond
-    pond_center = (screen_width // 2, screen_height // 2)  # Center of screen (600, 400)
-    pond_radius = 200
 
     # Draw the blue circle in the center (pond)
     pygame.draw.circle(screen, circle_color, pond_center, pond_radius)
