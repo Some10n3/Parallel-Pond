@@ -53,7 +53,7 @@ while running:
                 
             # Check if the mouse click is inside the Send Message button area
             if button_rect_send.collidepoint(mouse_x, mouse_y) and fish_animations:
-                send_fish_to_topicX(client, NETLINK, f"Fish{fish_animations[0].name}", fish_animations[0].remainingLifetime)
+                send_fish_to_topicX(client, DC_UNIVERSE, f"Fish{fish_animations[0].name}", fish_animations[0].remainingLifetime)
                 fish_animations.pop(0)  # Remove the first fish in the list
 
     # Fill the screen with the background color
@@ -80,6 +80,11 @@ while running:
     pygame.draw.rect(screen, button_color, button_rect_send)
     button_text_send = font.render("Send Fish", True, button_text_color)
     screen.blit(button_text_send, (button_rect_send.x + 10, button_rect_send.y + 10))  # Center the text
+
+    # Display the amount of fish
+    fish_amount = len(fish_animations)
+    fish_amount_text = font.render(f"Fish Amount: {fish_amount}", True, text_color)
+    screen.blit(fish_amount_text, (10, 10))  # Display at the top-left corner
 
     # Update the display
     pygame.display.flip()
