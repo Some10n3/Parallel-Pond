@@ -4,7 +4,7 @@ import time
 import json
 import os
 from PIL import Image
-from fish import Fish
+from fish import *
 from utils import *
 #pip install pillow
 
@@ -35,6 +35,18 @@ client.subscribe(TOPIC)
 client.subscribe("user/Parallel")
 
 
+fish_animations = get_fish_from_db()
+
+import threading
+
+def periodic_db_save():
+    while True:
+        time.sleep(3)  # Save every 30 seconds
+        update_all_fish_in_db(fish_animations)
+
+# Run in background thread
+threading.Thread(target=periodic_db_save, daemon=True).start()
+
 # Main loop to keep the script running and display messages
 running = True
 while running:
@@ -62,12 +74,13 @@ while running:
     # Draw the blue circle in the center (pond)
     pygame.draw.circle(screen, circle_color, pond_center, pond_radius)
 
-    # Update and draw the fish (GIFs) inside the pond
-    for fish in fish_animations:
+    for fish in fish_animations[:]:  # Iterate over a copy to avoid errors
         if not fish.update():
             print("removed fish", fish.name)
-            fish_animations.remove(fish)  # Remove the fish if its lifetime is over
-        fish.draw(screen)
+            fish_animations.remove(fish)
+        else:
+            fish.draw(screen)
+
 
     # Draw the "Spawn Picture" button on the left
     button_rect_spawn = pygame.Rect(10, 550, 200, 50)  # Bottom-left corner (10, 550)
@@ -91,4 +104,5 @@ while running:
 
     # Cap the frame rate to 60 frames per second
     clock.tick(60)
+
 

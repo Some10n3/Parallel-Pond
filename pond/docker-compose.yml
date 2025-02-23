@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: fish_db
+    restart: always
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgresql.conf:/etc/postgresql.conf
+      - pgdata:/var/lib/postgresql/data/
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    command: >
+      bash -c "
+        echo 'local all all trust' > /var/lib/postgresql/data/pg_hba.conf &&
+        echo 'host all all 127.0.0.1/32 md5' >> /var/lib/postgresql/data/pg_hba.conf &&
+        echo 'host all all ::1/128 md5' >> /var/lib/postgresql/data/pg_hba.conf &&
+        echo 'host all all 0.0.0.0/0 md5' >> /var/lib/postgresql/data/pg_hba.conf &&
+        docker-entrypoint.sh postgres
+      "
+
+volumes:
+  pgdata:
+    driver: local

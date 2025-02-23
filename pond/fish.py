@@ -1,14 +1,49 @@
 import time
 import pygame
+import psycopg2
+import json
 from PIL import Image
+import base64
 
-# Fish class to hold the fish GIF animation
+DB_CONFIG = {
+    "dbname": "postgres",
+    "user": "postgres",
+    "password": "password",
+    "host": "127.0.0.1",  # Try this instead of "localhost"
+    "port": 5432
+}
+
+def update_all_fish_in_db(fish_animations):
+    """ Update all fish in the database """
+    for fish in fish_animations:
+        fish.save_to_db()
+
+def get_fish_from_db():
+    """ Load all fish from the database """
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cur = conn.cursor()
+        
+        cur.execute("SELECT id FROM fish;")
+        fish_ids = cur.fetchall()
+        
+        fish_animations = []
+        for fish_id in fish_ids:
+            fish = Fish.load_from_db(fish_id)
+            if fish:
+                fish_animations.append(fish)
+        
+        cur.close()
+        conn.close()
+        return fish_animations
+    except Exception as e:
+        print(f"Error getting fish from database: {e}")
+    return []
+
 class Fish:
     def __init__(self, frames, position, id=None, lifetime=20):
-        if not id:
-            self.name = "Parallel_" + str(time.time())
-        else:
-            self.name = id
+        self.id = id
+        self.name = f"Parallel_{time.time()}" if not id else id
         self.frames = frames
         self.position = position
         self.current_frame_index = 0
@@ -17,35 +52,57 @@ class Fish:
 
     def update(self):
         current_time = time.time()
-        # print(self.remainingLifetime)
-        # Update the fish animation (switch frames every 500ms)
         if current_time - self.last_frame_time > 0.5:
             self.current_frame_index = (self.current_frame_index + 1) % len(self.frames)
             self.remainingLifetime -= (current_time - self.last_frame_time)
             self.last_frame_time = current_time
             print(f"{self.name}'s remaining lifetime : {self.remainingLifetime}")
-            return True
-        if self.remainingLifetime <= 0:
-            return False
+            return self.remainingLifetime > 0
         return True
 
     def draw(self, surface):
         surface.blit(self.frames[self.current_frame_index], self.position)
 
-    def save_as_gif(self, gif_name):
-        # Create a list of images for the GIF
-        pil_frames = []
-        
-        for frame in self.frames:
-            # Convert each Pygame surface to a byte string in RGBA format
-            frame_bytes = pygame.image.tostring(frame, 'RGBA')
+    def save_to_db(self):
+        """ Save the fish instance to PostgreSQL """
+        try:
+            conn = psycopg2.connect(**DB_CONFIG)
+            cur = conn.cursor()
+
+            frames_data = json.dumps([base64.b64encode(pygame.image.tostring(frame, 'RGBA')).decode('utf-8') for frame in self.frames])
+
+            cur.execute("""
+                INSERT INTO fish (name, position_x, position_y, remaining_lifetime, frames) 
+                VALUES (%s, %s, %s, %s, %s) RETURNING id;
+            """, (self.name, self.position[0], self.position[1], self.remainingLifetime, frames_data))
+
+            self.id = cur.fetchone()[0]
+            conn.commit()
+            print(f"Fish {self.name} saved to database with id {self.id}")
+            cur.close()
+            conn.close()
+        except Exception as e:
+            print(f"Error saving fish to database: {e}")
+
+
+    @classmethod
+    def load_from_db(cls, fish_id):
+        """ Load a fish instance from PostgreSQL """
+        try:
+            conn = psycopg2.connect(**DB_CONFIG)
+            cur = conn.cursor()
             
-            # Create a PIL Image from the byte string
-            pil_image = Image.frombytes('RGBA', (frame.get_width(), frame.get_height()), frame_bytes)
+            cur.execute("SELECT name, position_x, position_y, remaining_lifetime, frames FROM fish WHERE id = %s;", (fish_id,))
+            result = cur.fetchone()
             
-            # Append the PIL Image to the frames list
-            pil_frames.append(pil_image)
-        
-        # Save the frames as a GIF
-        pil_frames[0].save(gif_name, save_all=True, append_images=pil_frames[1:], loop=0, duration=500)
-        return gif_name
+            if result:
+                name, x, y, lifetime, frames_data = result
+                frames = [pygame.image.fromstring(bytes(frame), (64, 64), 'RGBA') for frame in json.loads(frames_data)]
+                fish = cls(frames, (x, y), id=name, lifetime=lifetime)
+                return fish
+            
+            cur.close()
+            conn.close()
+        except Exception as e:
+            print(f"Error loading fish from database: {e}")
+        return None

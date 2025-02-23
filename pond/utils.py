@@ -95,7 +95,6 @@ NETLINK = "user/NetLink"
 
 # Pond parameters
 received_messages = [] 
-fish_animations = []
 last_update_time = time.time()
 fish_frames = load_gif_frames("./lib/assets/Parallel.gif")
 
