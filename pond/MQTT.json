@@ -1,0 +1,7 @@
+{
+    "BROKER": "40.90.169.126",
+    "PORT": 1883,
+    "USERNAME": "dc24",
+    "PASSWORD": "kmitl-dc24",
+    "TOPIC": "fishhaven/stream"
+}
