@@ -1,0 +1,6 @@
+pygame
+paho-mqtt
+psycopg2
+psycopg2-binary
+prometheus_client
+pillow

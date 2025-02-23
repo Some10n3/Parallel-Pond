@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 5s  # Collect metrics every 5 seconds
+
+scrape_configs:
+  - job_name: "mqtt"
+    static_configs:
+      - targets: ["mqtt-broker:1883"]
+
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["postgres:5432"]
+
+  - job_name: "pygame-app"
+    static_configs:
+      - targets: ["pygame-app:8000"]

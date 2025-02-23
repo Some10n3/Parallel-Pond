@@ -4,7 +4,7 @@ from PIL import Image
 import random
 import math
 import json
-from fish import Fish
+from database_manager import DatabaseManager, Fish
 
 # Load and resize GIF frames
 def load_gif_frames(gif_path):
