@@ -1,10 +1,66 @@
 import pygame
+import paho.mqtt.client as mqtt
 import time
+import json
+import os
+import matplotlib.pyplot as plt
 from PIL import Image
+from fish import Fish
+from utils import *
 import random
 import math
-import json
-from fish import Fish
+
+# Observability Metrics
+message_count = 0
+valid_message_count = 0
+invalid_message_count = 0
+fish_types = {}
+received_messages = []
+message_logs = []  # For storing logs over time
+last_update_time = time.time()
+
+
+def log_observability():
+    global message_logs
+    print("\n--- Observability Data ---")
+    print(f"Total Messages: {message_count}")
+    print(f"Valid Messages: {valid_message_count}")
+    print(f"Invalid Messages: {invalid_message_count} (Bad Situation if High)")
+    print(f"Total Fish in Pond: {len(fish_animations)}")
+    print(f"Fish Types in Pond: {fish_types}")
+    print("-------------------------\n")
+    
+    # Store logs
+    message_logs.append({
+        "time": time.time(),
+        "total_messages": message_count,
+        "valid_messages": valid_message_count,
+        "invalid_messages": invalid_message_count,
+        "total_fish": len(fish_animations)
+    })
+
+def generate_chart():
+    if not message_logs:
+        return
+    
+    times = [log["time"] for log in message_logs]
+    total_messages = [log["total_messages"] for log in message_logs]
+    valid_messages = [log["valid_messages"] for log in message_logs]
+    invalid_messages = [log["invalid_messages"] for log in message_logs]
+    total_fish = [log["total_fish"] for log in message_logs]
+    
+    plt.figure(figsize=(10, 5))
+    plt.plot(times, total_messages, label="Total Messages", marker="o")
+    plt.plot(times, valid_messages, label="Valid Messages", marker="s")
+    plt.plot(times, invalid_messages, label="Invalid Messages", marker="x")
+    plt.plot(times, total_fish, label="Total Fish", marker="d")
+    
+    plt.xlabel("Time")
+    plt.ylabel("Count")
+    plt.legend()
+    plt.title("Observability Metrics Over Time")
+    plt.grid()
+    plt.show()
 
 # Load and resize GIF frames
 def load_gif_frames(gif_path):
@@ -39,22 +95,39 @@ def on_connect(client, userdata, flags, rc):
 
 # Callback when a message is received from the broker
 def on_message(client, userdata, msg):
-    payload = json.loads(msg.payload.decode())
-    print(f"Message received on topic {msg.topic}: {payload}")
-    if msg.topic == "user/Parallel":
-        if payload['group_name'] == "DC_Universe":
-            DC_FRAME = load_gif_frames("./lib/assets/DC_Universe.gif")
-            DC_POSITION = generate_random_position(pond_center, pond_radius, fish_frames[0].get_rect())
-            fish_animations.append(Fish(DC_FRAME, DC_POSITION, payload['name'], payload['lifetime']))
-        elif payload['group_name'] == "NetLink":
-            NETLINK_FRAME = load_gif_frames("./lib/assets/NetLink.gif")
-            NETLINK_POSITION = generate_random_position(pond_center, pond_radius, fish_frames[0].get_rect())
-            fish_animations.append(Fish(NETLINK_FRAME, NETLINK_POSITION, payload['name'], payload['lifetime']))
+    global message_count, valid_message_count, invalid_message_count
+    message_count += 1
+    try:
+        payload = json.loads(msg.payload.decode())
+        print(f"Message received on topic {msg.topic}: {payload}")
+        if msg.topic == "user/Parallel":
+            if payload['group_name'] == "DC_Universe":
+                DC_FRAME = load_gif_frames("./lib/assets/DC_Universe.gif")
+                DC_POSITION = generate_random_position(pond_center, pond_radius, fish_frames[0].get_rect())
+                fish_animations.append(Fish(DC_FRAME, DC_POSITION, payload['name'], payload['lifetime']))
+            elif payload['group_name'] == "NetLink":
+                NETLINK_FRAME = load_gif_frames("./lib/assets/NetLink.gif")
+                NETLINK_POSITION = generate_random_position(pond_center, pond_radius, fish_frames[0].get_rect())
+                fish_animations.append(Fish(NETLINK_FRAME, NETLINK_POSITION, payload['name'], payload['lifetime']))
+            elif payload['group_name'] == "Parallel":
+                PARALLEL_FRAME = load_gif_frames("./lib/assets/Parallel.gif")
+                PARALLEL_POSITION = generate_random_position(pond_center, pond_radius, fish_frames[0].get_rect())
+                fish_animations.append(Fish(PARALLEL_FRAME, PARALLEL_POSITION, payload['name'], payload['lifetime']))
+        if ("type" in payload and payload["type"] == "hello") or ("group_name" in payload and "name" in payload):
+            valid_message_count += 1
+            fish_type = payload["group_name"]
+            fish_types[fish_type] = fish_types.get(fish_type, 0) + 1
+            received_messages.append(payload)
+            if len(received_messages) > 10:
+                received_messages.pop(0)
+        else:
+            raise ValueError("Invalid message format")
+    except Exception:
+        invalid_message_count += 1
+        print("[ERROR] Invalid message received!")
+        print("Message:", msg.payload)
 
-    # Add received message to the list
-    received_messages.append(payload)
-    if len(received_messages) > 10: 
-        received_messages.pop(0)
+    log_observability()
 
 
 def send_fish_to_topicX(client, topicX, fishName, remainingLifetime):
@@ -94,7 +167,6 @@ DC_UNIVERSE = "user/DC_Universe"
 NETLINK = "user/NetLink"
 
 # Pond parameters
-received_messages = [] 
 fish_animations = []
 last_update_time = time.time()
 fish_frames = load_gif_frames("./lib/assets/Parallel.gif")

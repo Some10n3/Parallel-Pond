@@ -23,7 +23,7 @@ class Fish:
             self.current_frame_index = (self.current_frame_index + 1) % len(self.frames)
             self.remainingLifetime -= (current_time - self.last_frame_time)
             self.last_frame_time = current_time
-            print(f"{self.name}'s remaining lifetime : {self.remainingLifetime}")
+            # print(f"{self.name}'s remaining lifetime : {self.remainingLifetime}")
             return True
         if self.remainingLifetime <= 0:
             return False

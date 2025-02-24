@@ -41,7 +41,16 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_t:  # Press 'T' to trigger stress test
+                for _ in range(1000):  # Spawn 100 fish at once
+                    fish_position = generate_random_position(pond_center, pond_radius, fish_frames[0].get_rect())
+                    fish = Fish(fish_frames, fish_position)
+                    fish_animations.append(fish)
+                log_observability()
+
+                
         # Handle button click
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse_x, mouse_y = event.pos
@@ -50,10 +59,17 @@ while running:
                 # Spawn a new fish (GIF) at a random position in the pond
                 fish_position = generate_random_position(pond_center, pond_radius, fish_frames[0].get_rect())
                 fish_animations.append(Fish(fish_frames, fish_position))  # Add new fish to the list
+                if fish_types.get("Parallel", 0) > 0:
+                    fish_types["Parallel"] += 1
+                else:
+                    fish_types["Parallel"] = 1
                 
             # Check if the mouse click is inside the Send Message button area
             if button_rect_send.collidepoint(mouse_x, mouse_y) and fish_animations:
-                send_fish_to_topicX(client, DC_UNIVERSE, f"Fish{fish_animations[0].name}", fish_animations[0].remainingLifetime)
+                # send_fish_to_topicX(client, DC_UNIVERSE, f"Fish{fish_animations[0].name}", fish_animations[0].remainingLifetime)
+                send_fish_to_topicX(client, "user/Parallel", f"Fish{fish_animations[0].name}", fish_animations[0].remainingLifetime)
+                if fish_types.get("Parallel", 0) > 0:
+                    fish_types["Parallel"] -= 1
                 fish_animations.pop(0)  # Remove the first fish in the list
 
     # Fill the screen with the background color
@@ -85,6 +101,27 @@ while running:
     fish_amount = len(fish_animations)
     fish_amount_text = font.render(f"Fish Amount: {fish_amount}", True, text_color)
     screen.blit(fish_amount_text, (10, 10))  # Display at the top-left corner
+
+    frame_rate = clock.get_fps()
+    if frame_rate > 0:
+        frame_time = 1000 / frame_rate  # Convert FPS to ms
+    else:
+        frame_time = float('inf')  # Prevent division by zero
+
+    frame_rate_text = font.render(f"Frame Rate: {frame_rate:.2f}", True, text_color)
+    frame_time_text = font.render(f"Frame Time: {frame_time:.2f} ms", True, text_color)
+    screen.blit(frame_rate_text, (10, 50))
+    screen.blit(frame_time_text, (10, 80))
+
+    if frame_rate < 10:
+        print(f"[WARNING] Low frame rate: {frame_rate:.2f}, High frame time: {frame_time:.2f} ms")
+
+
+    if time.time() - last_update_time > 3:
+        # Logs every 3 second
+        log_observability()
+        generate_chart()
+        last_update_time = time.time()
 
     # Update the display
     pygame.display.flip()
