@@ -49,6 +49,8 @@ while running:
                     fish = Fish(fish_frames, fish_position)
                     fish_animations.append(fish)
                 log_observability()
+            if event.key == pygame.K_c:
+                generate_chart()
 
                 
         # Handle button click
@@ -120,7 +122,6 @@ while running:
     if time.time() - last_update_time > 3:
         # Logs every 3 second
         log_observability()
-        generate_chart()
         last_update_time = time.time()
 
     # Update the display

@@ -9,6 +9,7 @@ from fish import Fish
 from utils import *
 import random
 import math
+import psutil
 
 # Observability Metrics
 message_count = 0
@@ -22,12 +23,17 @@ last_update_time = time.time()
 
 def log_observability():
     global message_logs
+    cpu_usage = psutil.cpu_percent()
+    memory_usage = psutil.virtual_memory().percent
+
     print("\n--- Observability Data ---")
     print(f"Total Messages: {message_count}")
     print(f"Valid Messages: {valid_message_count}")
     print(f"Invalid Messages: {invalid_message_count} (Bad Situation if High)")
     print(f"Total Fish in Pond: {len(fish_animations)}")
     print(f"Fish Types in Pond: {fish_types}")
+    print(f"CPU Usage: {cpu_usage}%")
+    print(f"Memory Usage: {memory_usage}%")
     print("-------------------------\n")
     
     # Store logs
@@ -36,7 +42,9 @@ def log_observability():
         "total_messages": message_count,
         "valid_messages": valid_message_count,
         "invalid_messages": invalid_message_count,
-        "total_fish": len(fish_animations)
+        "total_fish": len(fish_animations),
+        "cpu_usage": cpu_usage,
+        "memory_usage": memory_usage
     })
 
 def generate_chart():
@@ -48,12 +56,17 @@ def generate_chart():
     valid_messages = [log["valid_messages"] for log in message_logs]
     invalid_messages = [log["invalid_messages"] for log in message_logs]
     total_fish = [log["total_fish"] for log in message_logs]
+    cpu_usage = [log["cpu_usage"] for log in message_logs]
+    memory_usage = [log["memory_usage"] for log in message_logs]
     
     plt.figure(figsize=(10, 5))
     plt.plot(times, total_messages, label="Total Messages", marker="o")
     plt.plot(times, valid_messages, label="Valid Messages", marker="s")
     plt.plot(times, invalid_messages, label="Invalid Messages", marker="x")
     plt.plot(times, total_fish, label="Total Fish", marker="d")
+    plt.plot(times, cpu_usage, label="CPU Usage", marker="^")
+    plt.plot(times, memory_usage, label="Memory Usage", marker="v")
+    
     
     plt.xlabel("Time")
     plt.ylabel("Count")
