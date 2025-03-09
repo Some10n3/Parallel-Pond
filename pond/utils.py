@@ -5,6 +5,7 @@ import random
 import math
 import json
 from fish import Fish
+import redis  # Import Redis
 
 # Load and resize GIF frames
 def load_gif_frames(gif_path):
@@ -39,8 +40,19 @@ def on_connect(client, userdata, flags, rc):
 
 # Callback when a message is received from the broker
 def on_message(client, userdata, msg):
-    payload = json.loads(msg.payload.decode())
+    message_data = msg.payload.decode()
+    print("[DEBUG] Received MQTT message:", message_data)
+    payload = json.loads(message_data)
     print(f"Message received on topic {msg.topic}: {payload}")
+
+    # Store message in Redis queue
+    redis_client.lpush("pond_messages", message_data)
+    print("[DEBUG] Pushed to Redis:", message_data)
+
+    # Publish to Redis Pub/Sub
+    redis_client.publish("pond_channel", message_data)
+    print("[DEBUG] Published to Redis channel")
+
     if msg.topic == "user/Parallel":
         if payload['group_name'] == "DC_Universe":
             DC_FRAME = load_gif_frames("./lib/assets/DC_Universe.gif")
@@ -92,6 +104,13 @@ TOPIC = config['TOPIC']
 # topic for sending to other group
 DC_UNIVERSE = "user/DC_Universe"
 NETLINK = "user/NetLink"
+PARRALLEL = "user/Parallel"
+
+# Redis connection (Connect to local Docker Redis)
+REDIS_HOST = "localhost"  # Connect to Redis running in Docker
+REDIS_PORT = 6379
+
+redis_client = redis.StrictRedis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
 # Pond parameters
 received_messages = [] 
